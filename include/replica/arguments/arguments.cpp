@@ -40,7 +40,7 @@ namespace Replica {
 
             sourcePath = std::filesystem::canonical(sourcePath);
 
-            if (currentDirectory != sourcePath) {
+            if (currentDirectory != sourcePath.parent_path()) {
                 //Change CWD.
                 std::filesystem::current_path(sourcePath);
             }

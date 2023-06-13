@@ -15,7 +15,6 @@ namespace Replica {
         std::filesystem::path& Source();
         [[nodiscard]] int InFd() const;
         std::shared_ptr<void*> Buffer();
-
     private:
         std::filesystem::path& _source;
         std::filesystem::path& _output;
@@ -23,9 +22,7 @@ namespace Replica {
         int _outfd;
         size_t _size {};
         std::shared_ptr<void*> _buffer {};
-
         void _statFileSize();
-
     };
 
 }

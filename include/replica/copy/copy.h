@@ -4,16 +4,15 @@
 
 #pragma once
 
-#include "replica/mappedFile/mapped.h"
+#include "replica/file/file.h"
 #include "replica/iou/ring.h"
 
 namespace Replica {
-    void Copy(MappedFile& file, IOU::Ring& ring)
+    void Copy(File& file, IOU::Ring& ring)
     {
-        auto fileSize  { std::filesystem::file_size(file.Source()) };
         auto blockSize { ring.BlockSize() };
         auto offset    { off64_t (0) };
-        auto remaining { fileSize };
+        auto remaining { file.Size() };
 
         //Ensure entire files is read.
         while (!remaining) {

@@ -11,7 +11,7 @@ namespace Replica {
     class Arguments :  public argparse::Args {
     public:
         std::filesystem::path &sourcePath = arg("Source path");
-        std::filesystem::path &outputPath =
+        std::optional<std::filesystem::path> &outputPath =
                 kwarg("o,outputPath", "Destination Path.").set_default(std::filesystem::current_path());
         int& entries       = kwarg("s,entries", "Number of SQE entries for the Ring instance.").set_default(16);
         int& blockSize     = kwarg("p,blockSize", "Size of read() operation in MBs.").set_default(32);
