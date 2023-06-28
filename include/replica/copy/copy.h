@@ -5,71 +5,34 @@
 #pragma once
 
 #include "replica/file/file.h"
-#include "replica/iou/ring.h"
+#include "replica/iou/ring/ring.h"
 
 namespace Replica {
     void Copy(File& file, IOU::Ring& ring)
     {
-        auto blockSize { ring.BlockSize() };
-        auto offset    { off64_t (0) };
-        auto remaining { file.Size() };
-
-        //Ensure entire files is read.
-        while (!remaining) {
+        auto completionCount { uintmax_t(0)};
+        //Ensure entire file is read and no completions remain.
+        while (!file.Complete() || completionCount > 0) {
             //Process Completions.
-            while(true) {
-                //Find at least one completion.
-                auto completion { ring.PeekCompletion() };
-
-                if (completion.has_value()) {
-                    //Check for completeness.
-                    completion->Process();
-
-                    if (completion.value().Completed()) {
-                        //Release CQE and track length of the read() result.
-                        ring.CompletionSeen(completion.value());
-                        remaining -= completion.value().Data()->Length();
-                    }
-
-                    //Resubmit due to EAGAIN or ECANCELED error during Process().
-                    if (!ring.PrepareSubmission(completion.value().Data())) {
-                        break;
-                    }
-
-                    //Clear completion before CQE is recycled.
-                    completion.reset();
-                    completion.value().Data()->Returned();
-                } else {
-                    //no completion found.
-                    break;
-                }
-            }
-
-            ring.Submit();
-
-            //Prepare as many shipments as possible
+            completionCount = ring.ProcessCompletions();
+            //Prepare as many submissions as possible
             while(true) {
 
-                if (remaining < blockSize ) {
-                    blockSize = remaining;
-                }
+                auto data {ring.DataHandler() };
 
-                auto data { ring.ReserveData() };
+                data->fd        = file.FD();
+                data->offset    = file.Offset();
+                data->blockSize = ring.BlockSize();
+                data->length    = ring.BlockSize();
+                data->buffer    = (char*)file.Buffer() + file.Offset();
 
-                data->fd        = file.InFd();
-                data->offset    = offset;
-                data->blockSize = blockSize;
-                data->length    = blockSize;
-                data->buffer    = file.Buffer().get();
-
-                //Fill Storage and Ship once full.
-                if (!ring.PrepareSubmission(data.get())) {
+                if(!ring.PrepareSubmissions(data.get()), &file) {
                     break;
                 }
-
-                //Update tracking.
-                offset += (off64_t) blockSize;
+                file.SetOffset(ring.BlockSize());
             }
+
+
         }
     }
 }

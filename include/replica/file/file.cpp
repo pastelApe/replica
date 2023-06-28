@@ -23,10 +23,11 @@ namespace Replica {
 /**********************************************************************************************************************/
     //Public Interface
 
-    File::File(const std::filesystem::path &sourcePath, std::optional<std::filesystem::path> &outputPath)
+    File::File(const std::filesystem::path &sourcePath, std::filesystem::path &outputPath)
     : source(sourcePath),
       output(outputPath),
-      inFd(open(sourcePath.c_str(), O_RDONLY)) {
+      inFd(open(sourcePath.c_str(), O_RDONLY))
+      {
 
         if (inFd == -1) {
             throw std::runtime_error(fmt::format("Failed to open sourcePath file {}. Error: {}",
@@ -34,24 +35,27 @@ namespace Replica {
                                                  strerror(errno)));
         }
 
-        statFile();
+          statFileSize();
 
-        if (output.has_value()) {
-            if (std::filesystem::is_directory(output.value())) {
-                output = output.value().string() + '/' + source.filename().string();
-            }
+        if (!output.has_root_directory()) {
+                output = std::filesystem::absolute(source.parent_path()).string()
+                        + '/'
+                        + source.stem().string()
+                        + "(Copy)"
+                        + source.extension().string();
 
-            open(output.value().c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
-
-            if (outFd == -1) {
-                throw std::runtime_error(fmt::format("Failed to open outputPath file {}. Error: {}",
-                                                     output.value().string(),
-                                                     strerror(errno)));
-            }
-
-            mmapFile();
         }
-    }
+
+        outFd = open(output.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+
+        if (outFd == -1) {
+            throw std::runtime_error(fmt::format("Failed to open outputPath file {}. Error: {}",
+                                                     output.string(),
+                                                     strerror(errno)));
+        }
+        mmapFile();
+      }
+
 
    File::~File() {
         close(inFd);
@@ -59,11 +63,7 @@ namespace Replica {
         munmap(address, size);
     }
 
-    uintmax_t File::Size() const { return size; }
-
-    bool File::Progress() const { return offset == size; }
-
-    void File::Update_Offset(off64_t bytesRead) { offset += bytesRead; }
+    void File::SetOffset(uintmax_t bytesRead) { offset += (off64_t)bytesRead; }
 
     void File::SortFilesInto(std::vector<std::unique_ptr<Replica::File>>& uniqueFiles,
                              std::vector<std::unique_ptr<Replica::File>>& duplicateFiles) {
@@ -88,38 +88,47 @@ namespace Replica {
 /**********************************************************************************************************************/
     //Private member functions
 
-    void File::statFile() {
+    void File::statFileSize()
+    {
+        struct stat st{};
 
-        if (fstat(inFd, metadata.get()) == -1) {
+        if (fstat(inFd, &st) == -1) {
             throw std::runtime_error(fmt::format("Could not stat size of files {}. Error: {}\n",
                                                  source.string(),
                                                  strerror(errno)));
         }
 
-        if (S_ISREG(metadata->st_mode)) {
-            size = metadata->st_size;
+        if (S_ISREG(st.st_mode)) {
+            size = st.st_size;
+        } else if (S_ISBLK(st.st_mode)) {
+            auto bytes { uint64_t(0) };
 
-        } else if (S_ISBLK(metadata->st_mode)) {
-
-            if (ioctl(inFd, BLKGETSIZE64, &size) == -1) {
+            if (ioctl(inFd, BLKGETSIZE64, &bytes) == -1) {
                 throw std::runtime_error(fmt::format("Could not stat size of block device {}. Error: {}\n",
                                                      source.string(),
                                                      strerror(errno)));
             }
+            size = bytes;
         }
     }
 
-    void *File::mmapFile() {
-        if (std::filesystem::file_size(output.value()) < size) {
-            if (ftruncate64(outFd, (off64_t ) size) == -1) {
-                throw std::runtime_error(fmt::format("Failed to allocate memory for the output file. Error: {}",
-                                                     source.string(),
-                                                     strerror(errno)));
-            }
+    void File::mmapFile() {
+        if (ftruncate64(outFd, (off64_t ) size) == -1) {
+            throw std::runtime_error(fmt::format("Failed to allocate memory for the output file. Error: {}",
+                                                 output.string(),
+                                                 strerror(errno)));
         }
 
         address = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, offset);
     }
+
+    int File::FD() const { return inFd; }
+
+    off64_t File::Offset() const { return offset; }
+
+    void* File::Buffer() { return address; }
+
+    bool File::Complete() const { return offset == size; }
 
 
 /**********************************************************************************************************************/

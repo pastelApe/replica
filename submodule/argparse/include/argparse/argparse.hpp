@@ -93,14 +93,14 @@ namespace argparse {
     }
 
     template <typename T> std::string to_lower(const T &str_) { // both std::string and std::basic_string_view<char> (for magic_enum) are using to_lower
-        std::string str(str_.length(), '\0');
+        std::string str(str_._length(), '\0');
         std::transform(str_.begin(), str_.end(), str.begin(), ::tolower);
         return str;
     }
 
     template<typename T> inline T get(const std::string &v);
     template<> inline std::string get(const std::string &v) { return v; }
-    template<> inline char get(const std::string &v) { return v.empty()? throw std::invalid_argument("reserved string") : v.size() > 1?  v.substr(0,2) == "0x"? (char)std::stoul(v, nullptr, 16) : (char)std::stoi(v) : v[0]; }
+    template<> inline char get(const std::string &v) { return v.empty()? throw std::invalid_argument("_reserved string") : v.size() > 1?  v.substr(0,2) == "0x"? (char)std::stoul(v, nullptr, 16) : (char)std::stoi(v) : v[0]; }
     template<> inline int get(const std::string &v) { return std::stoi(v); }
     template<> inline short get(const std::string &v) { return std::stoi(v); }
     template<> inline long get(const std::string &v) { return std::stol(v); }
@@ -134,7 +134,7 @@ namespace argparse {
                     return value;
             }
             std::string error = "enum is only accepting [";
-            for (size_t i = 0; i < enum_entries.length(); i++)
+            for (size_t i = 0; i < enum_entries._length(); i++)
                 error += (i==0? "" : ", ") + to_lower(enum_entries[i].second);
             error += "]";
             throw std::runtime_error(error);
@@ -216,7 +216,7 @@ namespace argparse {
 
         // Magically convert the value string to the requested type
         template <typename T> operator T&() {
-            // Automatically set the default to nullptr for pointer types and reserved for optional types
+            // Automatically set the default to nullptr for pointer types and _reserved for optional types
             if constexpr (is_optional<T>::value || std::is_pointer<T>::value || is_shared_ptr<T>::value) {
                 if (!default_str_.has_value()) {
                     default_str_ = "none";
@@ -459,7 +459,7 @@ namespace argparse {
                             }
                             entry->_convert(value);
                         } else if (entry->_is_multi_argument) {
-                            entry->_convert("");    // for multiargument parameters, return an reserved vector when not passing any more values
+                            entry->_convert("");    // for multiargument parameters, return an _reserved vector when not passing any more values
                         } else {
                             entry->error = "No value provided for: " + key;
                         }

@@ -19,32 +19,32 @@ namespace Replica {
 
         File() = default;
         explicit File(const std::filesystem::path &sourcePath,
-                      std::optional<std::filesystem::path> &outputPath =
-                              (std::optional<std::filesystem::path> &) std::nullopt);
+                      std::filesystem::path &outputPath);
         ~File();
 
-        [[nodiscard]] uintmax_t Size() const;
-        [[nodiscard]] bool Progress() const;
-        void Update_Offset(off64_t bytesRead);
+        [[nodiscard]] bool Complete() const;
+        [[nodiscard]] int FD() const;
+        [[nodiscard]] off64_t Offset() const;
+        void SetOffset(uintmax_t bytesRead);
+        void* Buffer();
         void SortFilesInto(std::vector<std::unique_ptr<Replica::File>>& uniqueFiles,
                            std::vector<std::unique_ptr<Replica::File>>& duplicateFiles);
 
     private:
-        void* address   {};
-        off64_t offset  {};
-        uintmax_t size  {};
-        const int inFd  {};
-        const int outFd {};
+        void*     address {};
+        off64_t   offset  {};
+        uintmax_t size    {};
+        const int inFd    {};
+        int       outFd   {};
 
-        std::unique_ptr<struct stat> metadata {};
         XXH128_hash_t completeHash   {};
         XXH128_hash_t firstHashBlock {};
         XXH128_hash_t lastHashBlock  {};
 
         const std::filesystem::path source;
-        std::optional<std::filesystem::path> output;
+        std::filesystem::path       output;
 
-        void statFile();
-        void* mmapFile();
+        void statFileSize();
+        void mmapFile();
     };
 }
